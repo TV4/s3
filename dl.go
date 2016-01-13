@@ -9,15 +9,20 @@ import (
 )
 
 type s3Downloader struct {
-	Cntc      chan int
-	Errc      chan error
-	bucket    string
-	s3Client  *s3.S3
-	dloader   *s3manager.Downloader
-	maxchunks int
+	bucket   string
+	s3Client *s3.S3
+	dloader  *s3manager.Downloader
 }
 
-func NewS3Downloader(bucket, id, secret, region string, maxchunks int) s3Downloader {
+type Config struct {
+	Bucket, ID, Secret, Region string
+}
+
+func NewDownloader(c Config) s3Downloader {
+	return NewS3Downloader(c.Bucket, c.ID, c.Secret, c.Region)
+}
+
+func NewS3Downloader(bucket, id, secret, region string) s3Downloader {
 	s3Client := s3.New(session.New(), awsConfig(id, secret, region))
 	dloader := &s3manager.Downloader{
 		PartSize:    1024 * 1024 * 5,
@@ -26,31 +31,31 @@ func NewS3Downloader(bucket, id, secret, region string, maxchunks int) s3Downloa
 	}
 
 	return s3Downloader{
-		bucket:    bucket,
-		s3Client:  s3Client,
-		dloader:   dloader,
-		maxchunks: maxchunks,
-		Cntc:      make(chan int),
-		Errc:      make(chan error),
+		bucket:   bucket,
+		s3Client: s3Client,
+		dloader:  dloader,
 	}
 }
 
-func (dldr *s3Downloader) DownloadChunks(path string, handler ChunkHandler) {
+func (dldr *s3Downloader) Download(path string, handler ChunkHandler) (<-chan int, <-chan error) {
+	return dldr.DownloadChunks(path, handler, 0)
+}
+
+func (dldr *s3Downloader) DownloadChunks(path string, handler ChunkHandler, chunks int) (<-chan int, <-chan error) {
 	objPath := &s3.ListObjectsInput{Bucket: &dldr.bucket, Prefix: &path}
+	cntc, errc := make(chan int), make(chan error)
 
 	go func() {
 		// Iterate over objects located in objPath
 		err := dldr.s3Client.ListObjectsPages(objPath, func(p *s3.ListObjectsOutput, lastPage bool) bool {
-			n := dldr.maxchunks
-			if dldr.maxchunks <= 0 || dldr.maxchunks > len(p.Contents) {
-				n = len(p.Contents)
+			if chunks <= 0 || chunks > len(p.Contents) {
+				chunks = len(p.Contents)
 			}
-			dldr.Cntc <- n
-			for i := 0; i < n; i++ {
+			cntc <- chunks
+			for i := 0; i < chunks; i++ {
 				obj, err := dldr.downloadObject(p.Contents[i])
 				if err != nil {
-					fmt.Println(err)
-					dldr.Errc <- err
+					errc <- err
 					return false
 				}
 				obj.ID = i
@@ -61,8 +66,7 @@ func (dldr *s3Downloader) DownloadChunks(path string, handler ChunkHandler) {
 			return true
 		})
 		if err != nil {
-			fmt.Println("XXXX", err)
-			dldr.Errc <- err
+			errc <- err
 			return
 		}
 
@@ -70,7 +74,7 @@ func (dldr *s3Downloader) DownloadChunks(path string, handler ChunkHandler) {
 		fmt.Println("download done")
 	}()
 
-	return
+	return cntc, errc
 }
 
 func (dldr *s3Downloader) downloadObject(o *s3.Object) (*Chunk, error) {
