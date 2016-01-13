@@ -70,7 +70,7 @@ func (dldr *s3Downloader) DownloadChunks(path string, handler ChunkHandler, chun
 			return
 		}
 
-		handler.Stop()
+		handler.OnDone()
 		fmt.Println("download done")
 	}()
 

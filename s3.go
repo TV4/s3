@@ -7,7 +7,7 @@ import (
 
 type ChunkHandler interface {
 	HandleChunk(*Chunk)
-	Stop()
+	OnDone()
 }
 
 func awsConfig(id, secret, region string) *aws.Config {
