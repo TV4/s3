@@ -2,16 +2,23 @@ package s3
 
 import (
 	"bytes"
-	"fmt"
 
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/s3"
 	"github.com/aws/aws-sdk-go/service/s3/s3manager"
 )
 
-func Upload(bucket, id, secret, region, key string, data []byte) {
-	ul := setupBurtUploader(bucket, id, secret, region)
-	ul.upload(data, key)
+// Upload starts the uploading of a binary object to the location given by
+// path in the bucket specified by the configuration. It returns the object
+// location in the bucket and an error value.
+func Upload(c BucketConf, path string, data []byte) (string, error) {
+	ul := NewUploader(c)
+	return ul.Upload(data, path)
+}
+
+// Uploader is the interface that wraps the Upload method.
+type Uploader interface {
+	Upload(data []byte, path string) (string, error)
 }
 
 type s3Uploader struct {
@@ -20,8 +27,10 @@ type s3Uploader struct {
 	uloader  *s3manager.Uploader
 }
 
-func setupBurtUploader(bucket, id, secret, region string) s3Uploader {
-	s3Client := s3.New(session.New(), awsConfig(id, secret, region))
+// NewUploader creates and initializes a new Uploader based on the values
+// contained in BucketConf.
+func NewUploader(c BucketConf) Uploader {
+	s3Client := s3.New(session.New(), awsConfig(c.ID, c.Secret, c.Region))
 
 	uloader := &s3manager.Uploader{
 		PartSize:       1024 * 1024 * 20,
@@ -31,23 +40,22 @@ func setupBurtUploader(bucket, id, secret, region string) s3Uploader {
 	}
 
 	return s3Uploader{
-		bucket:   bucket,
+		bucket:   c.Bucket,
 		s3Client: s3Client,
 		uloader:  uloader,
 	}
 }
 
-func (ul *s3Uploader) upload(data []byte, key string) {
+func (u s3Uploader) Upload(data []byte, key string) (string, error) {
 	params := &s3manager.UploadInput{
-		Bucket: &ul.bucket,
+		Bucket: &u.bucket,
 		Key:    &key,
 		Body:   bytes.NewBuffer(data),
 	}
-	fmt.Println(ul.bucket, key)
-	res, err := ul.uloader.Upload(params)
+	res, err := u.uloader.Upload(params)
 	if err != nil {
-		fmt.Println("error uploading:", err)
-		return
+		return "", err
 	}
-	fmt.Println("successfully uploaded:", res.Location)
+
+	return res.Location, nil
 }
