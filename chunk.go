@@ -2,20 +2,34 @@ package s3
 
 import (
 	"fmt"
-	"sync"
+	"io"
 )
 
+// Chunk is a writable structure representing a binary blob residing on an S3
+// bucket. It is written as part of the process of downloading objects from
+// S3.
 type Chunk struct {
-	b []byte
-	sync.RWMutex
+	b  []byte
 	ID int
 }
 
+// Read reads the next len(p) bytes from the chunk or until the chunk is
+// fully read. The return value is the number of bytes read. If the chunk
+// has no data, err is io.EOF.
 func (mb *Chunk) Read(p []byte) (int, error) {
+	if len(p) == 0 {
+		return 0, nil
+	}
+
+	if len(mb.b) == 0 {
+		return 0, io.EOF
+	}
+
 	n := len(mb.b)
 	if len(p) < n {
 		n = len(p)
 	}
+
 	nn := copy(p, mb.b[:n])
 	if nn < n {
 		n = nn
@@ -25,16 +39,16 @@ func (mb *Chunk) Read(p []byte) (int, error) {
 	return n, nil
 }
 
+// WriteAt writes the buffer p to the chunk buffer, starting at position off.
+// The return value is the number of bytes written.
 func (mb *Chunk) WriteAt(p []byte, off int64) (int, error) {
 	if int64(len(mb.b)) < off+int64(len(p)) {
-		mb.RLock() // FIXME(ivarg): remove?
 		nb := make([]byte, off+int64(len(p)))
 		if n := copy(nb, mb.b); n != len(mb.b) {
 			fmt.Println(off, len(p), len(mb.b), int64(len(mb.b)), len(nb), off+int64(len(p)))
-			return n, fmt.Errorf("did not copy correct number of bytes: %d instead of expected %d", n, len(mb.b))
+			return n, fmt.Errorf("copied %d bytes instead of the expected %d", n, len(mb.b))
 		}
 		mb.b = nb
-		mb.RUnlock()
 	}
 
 	dst := mb.b[off:]
