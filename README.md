@@ -5,18 +5,19 @@ s3 is a much simplified wrapper around AWS official Go SDK for the uploading and
 ## Example
 
 ```
-type handler struct {
+type chunkHandler struct {
   wg sync.WaitGroup
 }
 
-func (h handler) HandleChunk(c *s3.Chunk) {
+func (h chunkHandler) HandleChunk(c *s3.Chunk) {
+  // do something with the chunk
 }
 
-func (h handler) OnDone() {
+func (h chunkHandler) OnDone() {
   h.wg.Done()
 }
 
-func test() {
+func exampleObject(obj []byte) {
   conf := s3.BucketConf{
     Bucket: "s3://mybucket",
     Region: "eu-west-1",
@@ -25,7 +26,7 @@ func test() {
   }
   loc, err := s3.Upload(conf, "path/within/bucket/to/file.bin", obj)
 
-  h := handler{}
+  h := chunkHandler{}
   h.wg.Add(1)
   cntc, errc := s3.Download(conf, loc, h)
   select {
