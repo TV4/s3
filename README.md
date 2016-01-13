@@ -9,8 +9,11 @@ type chunkHandler struct {
   wg sync.WaitGroup
 }
 
-func (h chunkHandler) HandleChunk(c *s3.Chunk) {
-  // do something with the chunk
+func (h chunkHandler) HandleChunk(chunk *s3.Chunk) {
+  var buf bytes.Buffer
+  buf.ReadFrom(chunk) // chunk is an io.Reader
+
+  // do something with buf
 }
 
 func (h chunkHandler) OnDone() {
@@ -35,6 +38,6 @@ func exampleObject(obj []byte) {
 	  log.Fatal(err)
   }
 
-  h.wg.Wait() // Block until download is one
+  h.wg.Wait() // Block until download is done
 
 ```
