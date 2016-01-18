@@ -68,8 +68,13 @@ func (d s3Downloader) DownloadChunks(path string, handler ChunkHandler, chunks i
 				chunks = len(p.Contents)
 			}
 			cntc <- chunks
+
+			var (
+				obj *Chunk
+				err error
+			)
 			for i := 0; i < chunks; i++ {
-				obj, err := d.downloadObject(p.Contents[i])
+				obj, err = d.downloadObject(p.Contents[i])
 				if err != nil {
 					errc <- err
 					return false
