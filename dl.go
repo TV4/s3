@@ -23,7 +23,7 @@ func Download(c BucketConf, path string, handler ChunkHandler) (<-chan int, <-ch
 // with resources split into large numbers of chunks.
 type Downloader interface {
 	Download(path string, handler ChunkHandler) (<-chan int, <-chan error)
-	DownloadChunks(path string, handler ChunkHandler, chunks int) (<-chan int, <-chan error)
+	DownloadChunks(path string, handler ChunkHandler, chunks, startchunk int) (<-chan int, <-chan error)
 }
 
 type s3Downloader struct {
@@ -54,18 +54,18 @@ func newS3Downloader(bucket, id, secret, region string) s3Downloader {
 }
 
 func (d s3Downloader) Download(path string, handler ChunkHandler) (<-chan int, <-chan error) {
-	return d.DownloadChunks(path, handler, 0)
+	return d.DownloadChunks(path, handler, 0, 0)
 }
 
-func (d s3Downloader) DownloadChunks(path string, handler ChunkHandler, chunks int) (<-chan int, <-chan error) {
+func (d s3Downloader) DownloadChunks(path string, handler ChunkHandler, chunks, startchunk int) (<-chan int, <-chan error) {
 	objPath := &s3.ListObjectsInput{Bucket: &d.bucket, Prefix: &path}
 	cntc, errc := make(chan int), make(chan error)
 
 	go func() {
 		// Iterate over objects located in objPath
 		err := d.s3Client.ListObjectsPages(objPath, func(p *s3.ListObjectsOutput, lastPage bool) bool {
-			if chunks <= 0 || chunks > len(p.Contents) {
-				chunks = len(p.Contents)
+			if chunks <= 0 || chunks > len(p.Contents)-startchunk {
+				chunks = len(p.Contents) - startchunk
 			}
 			cntc <- chunks
 
@@ -73,7 +73,7 @@ func (d s3Downloader) DownloadChunks(path string, handler ChunkHandler, chunks i
 				obj *Chunk
 				err error
 			)
-			for i := 0; i < chunks; i++ {
+			for i := startchunk; i < startchunk+chunks; i++ {
 				obj, err = d.downloadObject(p.Contents[i])
 				if err != nil {
 					errc <- err
