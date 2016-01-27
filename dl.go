@@ -10,20 +10,20 @@ import (
 
 // Download starts the downloading of a resource residing at path in the
 // bucket given by the configuration.
-func Download(c BucketConf, path string, handler ChunkHandler) (<-chan int, <-chan error) {
+func Download(c BucketConf, path string, handler ObjectHandler) (<-chan int, <-chan error) {
 	d := NewDownloader(c)
 	return d.Download(path, handler)
 }
 
 // Downloader exposes two methods to download objects from an S3 bucket.
 // Download takes as parameters a path to a resource located in the bucket,
-// and a ChunkHandler to handle each chunk of the resources as it is
-// downloaded. DownloadChunks is for testing purposes and offers a way to
-// limit the number of chunks downloaded. This can be convenient when dealing
-// with resources split into large numbers of chunks.
+// and an ObjectHandler to handle each object of the resource as it is
+// downloaded. DownloadObjects is for testing purposes and offers a way to
+// limit the number of objects downloaded. This can be convenient when dealing
+// with resources containing large numbers of objects.
 type Downloader interface {
-	Download(path string, handler ChunkHandler) (<-chan int, <-chan error)
-	DownloadChunks(path string, handler ChunkHandler, chunks, startchunk int) (<-chan int, <-chan error)
+	Download(path string, handler ObjectHandler) (<-chan int, <-chan error)
+	DownloadObjects(path string, handler ObjectHandler, nobj, startobj int) (<-chan int, <-chan error)
 }
 
 type s3Downloader struct {
@@ -53,27 +53,27 @@ func newS3Downloader(bucket, id, secret, region string) s3Downloader {
 	}
 }
 
-func (d s3Downloader) Download(path string, handler ChunkHandler) (<-chan int, <-chan error) {
-	return d.DownloadChunks(path, handler, 0, 0)
+func (d s3Downloader) Download(path string, handler ObjectHandler) (<-chan int, <-chan error) {
+	return d.DownloadObjects(path, handler, 0, 0)
 }
 
-func (d s3Downloader) DownloadChunks(path string, handler ChunkHandler, chunks, startchunk int) (<-chan int, <-chan error) {
+func (d s3Downloader) DownloadObjects(path string, handler ObjectHandler, nobj, startobj int) (<-chan int, <-chan error) {
 	objPath := &s3.ListObjectsInput{Bucket: &d.bucket, Prefix: &path}
 	cntc, errc := make(chan int), make(chan error)
 
 	go func() {
 		// Iterate over objects located in objPath
 		err := d.s3Client.ListObjectsPages(objPath, func(p *s3.ListObjectsOutput, lastPage bool) bool {
-			if chunks <= 0 || chunks > len(p.Contents)-startchunk {
-				chunks = len(p.Contents) - startchunk
+			if nobj <= 0 || nobj > len(p.Contents)-startobj {
+				nobj = len(p.Contents) - startobj
 			}
-			cntc <- chunks
+			cntc <- nobj
 
 			var (
-				obj *Chunk
+				obj *Object
 				err error
 			)
-			for i := startchunk; i < startchunk+chunks; i++ {
+			for i := startobj; i < startobj+nobj; i++ {
 				obj, err = d.downloadObject(p.Contents[i])
 				if err != nil {
 					errc <- err
@@ -82,7 +82,7 @@ func (d s3Downloader) DownloadChunks(path string, handler ChunkHandler, chunks, 
 				obj.ID = i
 				// do something with the object
 				fmt.Printf("chunk %d downloaded\n", obj.ID)
-				handler.HandleChunk(obj)
+				handler.HandleObject(obj)
 			}
 			return true
 		})
@@ -98,8 +98,8 @@ func (d s3Downloader) DownloadChunks(path string, handler ChunkHandler, chunks, 
 	return cntc, errc
 }
 
-func (d s3Downloader) downloadObject(o *s3.Object) (*Chunk, error) {
-	obj := new(Chunk)
+func (d s3Downloader) downloadObject(o *s3.Object) (*Object, error) {
+	obj := new(Object)
 	params := s3.GetObjectInput{
 		Bucket: &d.bucket,
 		Key:    o.Key,

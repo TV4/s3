@@ -5,10 +5,10 @@ import (
 	"github.com/aws/aws-sdk-go/aws/credentials"
 )
 
-// ChunkHandler declares the interface needed to receive the chunks downloaded
+// ObjectHandler declares the interface needed to receive the objects downloaded
 // by the Downloader.
-type ChunkHandler interface {
-	HandleChunk(*Chunk)
+type ObjectHandler interface {
+	HandleObject(*Object)
 	OnDone()
 }
 

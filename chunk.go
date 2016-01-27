@@ -5,18 +5,18 @@ import (
 	"io"
 )
 
-// Chunk is a writable structure representing a binary blob residing on an S3
+// Object is a writable structure representing a binary blob residing on an S3
 // bucket. It is written as part of the process of downloading objects from
 // S3.
-type Chunk struct {
+type Object struct {
 	b  []byte
 	ID int
 }
 
-// Read reads the next len(p) bytes from the chunk or until the chunk is
-// fully read. The return value is the number of bytes read. If the chunk
+// Read reads the next len(p) bytes from the object or until the object is
+// fully read. The return value is the number of bytes read. If the object
 // has no data, err is io.EOF.
-func (mb *Chunk) Read(p []byte) (int, error) {
+func (mb *Object) Read(p []byte) (int, error) {
 	if len(p) == 0 {
 		return 0, nil
 	}
@@ -39,9 +39,9 @@ func (mb *Chunk) Read(p []byte) (int, error) {
 	return n, nil
 }
 
-// WriteAt writes the buffer p to the chunk buffer, starting at position off.
+// WriteAt writes the buffer p to the object buffer, starting at position off.
 // The return value is the number of bytes written.
-func (mb *Chunk) WriteAt(p []byte, off int64) (int, error) {
+func (mb *Object) WriteAt(p []byte, off int64) (int, error) {
 	if int64(len(mb.b)) < off+int64(len(p)) {
 		nb := make([]byte, off+int64(len(p)))
 		if n := copy(nb, mb.b); n != len(mb.b) {
