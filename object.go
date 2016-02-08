@@ -45,7 +45,6 @@ func (mb *Object) WriteAt(p []byte, off int64) (int, error) {
 	if int64(len(mb.b)) < off+int64(len(p)) {
 		nb := make([]byte, off+int64(len(p)))
 		if n := copy(nb, mb.b); n != len(mb.b) {
-			fmt.Println(off, len(p), len(mb.b), int64(len(mb.b)), len(nb), off+int64(len(p)))
 			return n, fmt.Errorf("copied %d bytes instead of the expected %d", n, len(mb.b))
 		}
 		mb.b = nb

@@ -1,8 +1,6 @@
 package s3
 
 import (
-	"fmt"
-
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/s3"
 	"github.com/aws/aws-sdk-go/service/s3/s3manager"
@@ -80,8 +78,6 @@ func (d s3Downloader) DownloadObjects(path string, handler ObjectHandler, nobj, 
 					return false
 				}
 				obj.ID = i
-				// do something with the object
-				fmt.Printf("chunk %d downloaded\n", obj.ID)
 				handler.HandleObject(obj)
 			}
 			return true
@@ -92,7 +88,6 @@ func (d s3Downloader) DownloadObjects(path string, handler ObjectHandler, nobj, 
 		}
 
 		handler.OnDone()
-		fmt.Println("download done")
 	}()
 
 	return cntc, errc
